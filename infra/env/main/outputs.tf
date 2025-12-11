@@ -56,3 +56,28 @@ output "physics_service_account_email" {
   description = "Email of the Physics service account"
   value       = module.sa_physics_service.email
 }
+
+output "squad_service_url" {
+  description = "URL of the Squad service"
+  value       = module.squad_service.url
+}
+
+output "squad_service_account_email" {
+  description = "Email of the Squad service account"
+  value       = module.sa_squad_service.email
+}
+
+output "chemistry_python_sidecar_url" {
+  description = "URL of the Chemistry Python Sidecar service"
+  value       = module.chemistry_python_sidecar.url
+}
+
+output "chemistry_gateway_url" {
+  description = "URL of the Chemistry Gateway service"
+  value       = module.chemistry_gateway.url
+}
+
+output "chemistry_service_account_email" {
+  description = "Email of the Chemistry service account"
+  value       = module.sa_chemistry_service.email
+}

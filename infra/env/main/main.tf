@@ -97,6 +97,36 @@ module "sa_physics_service" {
   ]
 }
 
+# Squad Service Account
+module "sa_squad_service" {
+  source       = "../../modules/service_account"
+  project_id   = local.project_id
+  account_id   = "sa-squad-service"
+  display_name = "Squad Service Account"
+  project_roles = [
+    "roles/datastore.user",
+    "roles/run.invoker",
+    "roles/secretmanager.secretAccessor",
+    "roles/logging.logWriter",
+    "roles/monitoring.metricWriter"
+  ]
+}
+
+# Chemistry Service Account
+module "sa_chemistry_service" {
+  source       = "../../modules/service_account"
+  project_id   = local.project_id
+  account_id   = "sa-chemistry-service"
+  display_name = "Chemistry Service Account"
+  project_roles = [
+    "roles/datastore.user",
+    "roles/aiplatform.user",
+    "roles/run.invoker",
+    "roles/secretmanager.secretAccessor",
+    "roles/cloudtrace.admin"
+  ]
+}
+
 ########################################
 # 4. CLOUD RUN SERVICES
 ########################################
@@ -129,7 +159,7 @@ module "ai_mentor_service" {
 
     MATH_MCP_URL    = module.mathematic_service.url
     PHYSICS_MCP_URL = module.physics_gateway.url
-    CHEM_MCP_URL    = var.chem_mcp_url
+    CHEM_MCP_URL    = module.chemistry_gateway.url
 
     FIRESTORE_COLLECTION = "mentor/sessions"
     MCP_ENABLED          = "true"
@@ -257,6 +287,84 @@ module "physics_gateway" {
   env_vars = {
     ENVIRONMENT          = "production"
     PYTHON_SIDECAR_ADDR  = "${module.physics_python_sidecar.url}:50051"
+    GOOGLE_CLOUD_PROJECT = "octo-education-ddc76"
+    REDIS_ENABLED        = "false"
+  }
+}
+
+# Squad Service
+module "squad_service" {
+  source     = "../../modules/cloud_run_service"
+  project_id = local.project_id
+  region     = local.region
+
+  name                  = "squad-service"
+  image                 = "us-central1-docker.pkg.dev/octo-education-ddc76/services/squad-service:latest"
+  service_account_email = module.sa_squad_service.email
+
+  cpu           = "1"
+  memory        = "512Mi"
+  concurrency   = 80
+  min_instances = 0
+  max_instances = 10
+  ingress       = "INGRESS_TRAFFIC_ALL"
+
+  env_vars = {
+    GOOGLE_CLOUD_PROJECT = "octo-education-ddc76"
+    FIRESTORE_PROJECT_ID = "octo-education-ddc76"
+    ENVIRONMENT          = "production"
+  }
+}
+
+# Chemistry Python Sidecar (gRPC Server)
+module "chemistry_python_sidecar" {
+  source     = "../../modules/cloud_run_service"
+  project_id = local.project_id
+  region     = local.region
+
+  name                  = "chemistry-python-sidecar"
+  image                 = "us-central1-docker.pkg.dev/octo-education-ddc76/services/chemistry-python-sidecar:latest"
+  service_account_email = module.sa_chemistry_service.email
+
+  cpu           = "2"
+  memory        = "1Gi"
+  concurrency   = 80
+  min_instances = 0
+  max_instances = 10
+  ingress       = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+
+  env_vars = {
+    GOOGLE_CLOUD_PROJECT = "octo-education-ddc76"
+    VERTEX_AI_PROJECT_ID = "octo-education-ddc76"
+    VERTEX_AI_LOCATION   = "us-central1"
+    VERTEX_AI_MODEL      = "gemini-2.0-flash-exp"
+    FIRESTORE_PROJECT_ID = "octo-education-ddc76"
+    USE_MOCK_LLM         = "false"
+    REDIS_ENABLED        = "false"
+    GRPC_PORT            = "50051"
+  }
+}
+
+# Chemistry Gateway (HTTP API)
+module "chemistry_gateway" {
+  source     = "../../modules/cloud_run_service"
+  project_id = local.project_id
+  region     = local.region
+
+  name                  = "chemistry-gateway"
+  image                 = "us-central1-docker.pkg.dev/octo-education-ddc76/services/chemistry-gateway:latest"
+  service_account_email = module.sa_chemistry_service.email
+
+  cpu           = "1"
+  memory        = "512Mi"
+  concurrency   = 80
+  min_instances = 0
+  max_instances = 10
+  ingress       = "INGRESS_TRAFFIC_ALL"
+
+  env_vars = {
+    ENVIRONMENT          = "production"
+    PYTHON_SIDECAR_ADDR  = "${module.chemistry_python_sidecar.url}:50051"
     GOOGLE_CLOUD_PROJECT = "octo-education-ddc76"
     REDIS_ENABLED        = "false"
   }

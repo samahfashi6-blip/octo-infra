@@ -21,10 +21,4 @@ variable "auditor_service_url" {
   default     = "https://auditor-service-placeholder.run.app"
 }
 
-# Note: Math and Physics MCP URLs are now managed by Terraform module outputs
-
-variable "chem_mcp_url" {
-  description = "Chemistry MCP service URL"
-  type        = string
-  default     = "https://chem-expert-placeholder.run.app"
-}
+# Note: Math, Physics, and Chemistry MCP URLs are now managed by Terraform module outputs
