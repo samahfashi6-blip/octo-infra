@@ -9,12 +9,6 @@ variable "region" {
 # Service URLs for inter-service communication
 # Note: CIE API URL is now managed by Terraform module output
 
-variable "curriculum_api_url" {
-  description = "Curriculum API service URL"
-  type        = string
-  default     = "https://curriculum-service-placeholder.run.app"
-}
-
 variable "auditor_service_url" {
   description = "Auditor service URL"
   type        = string

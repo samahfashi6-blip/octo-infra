@@ -127,6 +127,35 @@ module "sa_chemistry_service" {
   ]
 }
 
+# Core Admin API Service Account
+module "sa_core_admin_api" {
+  source       = "../../modules/service_account"
+  project_id   = local.project_id
+  account_id   = "sa-core-admin-api"
+  display_name = "Core Admin API Service Account"
+  project_roles = [
+    "roles/datastore.user",
+    "roles/firebase.admin",
+    "roles/bigquery.dataViewer",
+    "roles/redis.admin",
+    "roles/pubsub.publisher",
+    "roles/storage.objectViewer"
+  ]
+}
+
+# Curriculum Service Account
+module "sa_curriculum_service" {
+  source       = "../../modules/service_account"
+  project_id   = local.project_id
+  account_id   = "sa-curriculum-service"
+  display_name = "Curriculum Service Account"
+  project_roles = [
+    "roles/datastore.user",
+    "roles/storage.objectAdmin",
+    "roles/pubsub.publisher"
+  ]
+}
+
 ########################################
 # 4. CLOUD RUN SERVICES
 ########################################
@@ -154,7 +183,7 @@ module "ai_mentor_service" {
     GEMINI_PROJECT_ID    = "octo-education-ddc76"
 
     CIE_API_URL         = module.cie_api_service.url
-    CURRICULUM_API_URL  = var.curriculum_api_url
+    CURRICULUM_API_URL  = module.curriculum_service.url
     AUDITOR_SERVICE_URL = var.auditor_service_url
 
     MATH_MCP_URL    = module.mathematic_service.url
@@ -367,5 +396,58 @@ module "chemistry_gateway" {
     PYTHON_SIDECAR_ADDR  = "${module.chemistry_python_sidecar.url}:50051"
     GOOGLE_CLOUD_PROJECT = "octo-education-ddc76"
     REDIS_ENABLED        = "false"
+  }
+}
+
+# Core Admin API
+module "core_admin_api" {
+  source     = "../../modules/cloud_run_service"
+  project_id = local.project_id
+  region     = local.region
+
+  name                  = "core-admin-api"
+  image                 = "us-central1-docker.pkg.dev/octo-education-ddc76/services/core-admin-api:latest"
+  service_account_email = module.sa_core_admin_api.email
+
+  cpu           = "1"
+  memory        = "512Mi"
+  concurrency   = 80
+  min_instances = 0
+  max_instances = 10
+  ingress       = "INGRESS_TRAFFIC_ALL"
+
+  env_vars = {
+    GCP_PROJECT_ID = "octo-education-ddc76"
+    ENVIRONMENT    = "production"
+  }
+}
+
+# Curriculum Service
+module "curriculum_service" {
+  source     = "../../modules/cloud_run_service"
+  project_id = local.project_id
+  region     = local.region
+
+  name                  = "curriculum-service"
+  image                 = "us-central1-docker.pkg.dev/octo-education-ddc76/services/curriculum-service:latest"
+  service_account_email = module.sa_curriculum_service.email
+
+  cpu           = "1"
+  memory        = "512Mi"
+  concurrency   = 80
+  min_instances = 0
+  max_instances = 10
+  ingress       = "INGRESS_TRAFFIC_ALL"
+
+  env_vars = {
+    FIRESTORE_PROJECT_ID            = "octo-education-ddc76"
+    CLOUD_STORAGE_BUCKET            = "octo-education-ddc76-curriculum-materials"
+    PUBSUB_PROJECT_ID               = "octo-education-ddc76"
+    PUBSUB_TOPIC_CURRICULUM_UPDATED = "curriculum.objective.updated"
+    CIE_API_URL                     = module.cie_api_service.url
+    CIE_API_ENABLED                 = "true"
+    PUBSUB_ENABLED                  = "true"
+    AUTH_ENABLED                    = "true"
+    ENVIRONMENT                     = "production"
   }
 }

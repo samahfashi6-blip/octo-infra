@@ -81,3 +81,23 @@ output "chemistry_service_account_email" {
   description = "Email of the Chemistry service account"
   value       = module.sa_chemistry_service.email
 }
+
+output "core_admin_api_url" {
+  description = "URL of the Core Admin API service"
+  value       = module.core_admin_api.url
+}
+
+output "core_admin_api_service_account_email" {
+  description = "Email of the Core Admin API service account"
+  value       = module.sa_core_admin_api.email
+}
+
+output "curriculum_service_url" {
+  description = "URL of the Curriculum Service"
+  value       = module.curriculum_service.url
+}
+
+output "curriculum_service_account_email" {
+  description = "Email of the Curriculum Service account"
+  value       = module.sa_curriculum_service.email
+}
