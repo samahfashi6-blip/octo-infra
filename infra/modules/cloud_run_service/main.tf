@@ -30,7 +30,7 @@ resource "google_cloud_run_v2_service" "this" {
       max_instance_count = var.max_instances
     }
 
-    concurrency = var.concurrency
+    max_instance_request_concurrency = var.concurrency
   }
 
   ingress = var.ingress

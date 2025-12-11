@@ -1,107 +1,86 @@
-# ==============================================================================
-# Main Environment Configuration
-# ==============================================================================
-# This is where you instantiate your modules to create actual infrastructure.
-# Each module call creates a set of resources in your GCP project.
-#
-# PASTE YOUR MODULE INSTANTIATIONS HERE
-# ==============================================================================
+########################################
+# LOCALS
+########################################
 
-# Example: Cloud Run Service
-# module "api_service" {
-#   source = "../../modules/cloud_run_service"
-#
-#   project_id              = var.project_id
-#   region                  = var.region
-#   service_name            = "api-service"
-#   image                   = "gcr.io/${var.project_id}/api-service:latest"
-#   cpu                     = "1"
-#   memory                  = "512Mi"
-#   concurrency             = 80
-#   min_instances           = 1
-#   max_instances           = 10
-#   service_account_email   = module.api_service_account.email
-#   allow_unauthenticated   = false
-#
-#   env_vars = {
-#     ENVIRONMENT = "production"
-#     PROJECT_ID  = var.project_id
-#   }
-# }
+locals {
+  project_id = var.project_id
+  region     = var.region
+}
 
-# Example: Service Account
-# module "api_service_account" {
-#   source = "../../modules/service_account"
-#
-#   project_id   = var.project_id
-#   account_id   = "api-service"
-#   display_name = "API Service Account"
-#   description  = "Service account for API Cloud Run service"
-#
-#   roles = [
-#     "roles/pubsub.publisher",
-#     "roles/storage.objectViewer",
-#   ]
-# }
+########################################
+# 0. ENABLE CORE APIS (AI Mentor Only)
+########################################
 
-# Example: Pub/Sub Topic
-# module "events_topic" {
-#   source = "../../modules/pubsub_topic"
-#
-#   project_id                 = var.project_id
-#   topic_name                 = "events-topic"
-#   message_retention_duration = "604800s"
-#
-#   labels = {
-#     environment = "production"
-#   }
-# }
+resource "google_project_service" "services" {
+  for_each = toset([
+    "run.googleapis.com",
+    "iam.googleapis.com",
+    "artifactregistry.googleapis.com",
+    "firestore.googleapis.com",
+    "secretmanager.googleapis.com",
+    "logging.googleapis.com",
+    "monitoring.googleapis.com"
+  ])
 
-# Example: Pub/Sub Push Subscription with OIDC
-# module "events_subscription" {
-#   source = "../../modules/pubsub_subscription"
-#
-#   project_id                   = var.project_id
-#   subscription_name            = "events-subscription"
-#   topic_name                   = module.events_topic.topic_name
-#   ack_deadline_seconds         = 10
-#   push_endpoint                = "${module.api_service.service_url}/webhook"
-#   oidc_token_audience          = module.api_service.service_url
-#   oidc_service_account_email   = module.api_service_account.email
-# }
+  project            = local.project_id
+  service            = each.key
+  disable_on_destroy = false
+}
 
-# Example: Cloud Storage Bucket
-# module "data_bucket" {
-#   source = "../../modules/bucket"
-#
-#   project_id                  = var.project_id
-#   bucket_name                 = "${var.project_id}-data-bucket"
-#   location                    = var.region
-#   storage_class               = "STANDARD"
-#   versioning_enabled          = true
-#   uniform_bucket_level_access = true
-#
-#   lifecycle_rules = [
-#     {
-#       action = {
-#         type          = "SetStorageClass"
-#         storage_class = "NEARLINE"
-#       }
-#       condition = {
-#         age = 30
-#       }
-#     },
-#     {
-#       action = {
-#         type = "Delete"
-#       }
-#       condition = {
-#         age = 90
-#       }
-#     }
-#   ]
-#
-#   labels = {
-#     environment = "production"
-#   }
-# }
+########################################
+# 3. SERVICE ACCOUNTS (AI Mentor Only)
+########################################
+
+module "sa_ai_mentor" {
+  source       = "../../modules/service_account"
+  project_id   = local.project_id
+  account_id   = "sa-ai-mentor-service"
+  display_name = "AI Mentor Service Account"
+  project_roles = [
+    "roles/datastore.user",
+    "roles/secretmanager.secretAccessor",
+    "roles/run.invoker",
+    "roles/logging.logWriter",
+    "roles/monitoring.metricWriter"
+  ]
+}
+
+########################################
+# 4. CLOUD RUN SERVICES (AI Mentor Only)
+########################################
+
+# AI Mentor Service
+module "ai_mentor_service" {
+  source   = "../../modules/cloud_run_service"
+  project_id = local.project_id
+  region     = local.region
+
+  name                  = "ai-mentor-service"
+  image                 = "us-central1-docker.pkg.dev/octo-education-ddc76/services/ai-mentor-service:latest"
+  service_account_email = module.sa_ai_mentor.email
+
+  cpu           = "2"
+  memory        = "1Gi"
+  concurrency   = 80
+  min_instances = 1
+  max_instances = 10
+  ingress       = "INGRESS_TRAFFIC_ALL"
+
+  env_vars = {
+    GCP_PROJECT_ID       = "octo-education-ddc76"
+    FIRESTORE_PROJECT_ID = "octo-education-ddc76"
+    GEMINI_PROJECT_ID    = "octo-education-ddc76"
+
+    CIE_API_URL        = var.cie_api_url
+    CURRICULUM_API_URL = var.curriculum_api_url
+    AUDITOR_SERVICE_URL = var.auditor_service_url
+
+    MATH_MCP_URL    = var.math_mcp_url
+    PHYSICS_MCP_URL = var.physics_mcp_url
+    CHEM_MCP_URL    = var.chem_mcp_url
+
+    FIRESTORE_COLLECTION = "mentor/sessions"
+    MCP_ENABLED          = "true"
+    GEMINI_ENABLED       = "true"
+  }
+}
