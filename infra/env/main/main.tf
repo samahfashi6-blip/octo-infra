@@ -420,6 +420,13 @@ module "core_admin_api" {
     GCP_PROJECT_ID = "octo-education-ddc76"
     ENVIRONMENT    = "production"
   }
+
+  secrets = {
+    JWT_SECRET = {
+      secret  = "jwt-secret"
+      version = "latest"
+    }
+  }
 }
 
 # Curriculum Service

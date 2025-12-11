@@ -13,3 +13,11 @@ variable "env_vars" {
   type    = map(string)
   default = {}
 }
+
+variable "secrets" {
+  type = map(object({
+    secret  = string
+    version = string
+  }))
+  default = {}
+}
