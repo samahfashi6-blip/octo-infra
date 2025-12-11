@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "79785327518",
+    "project_id": "octo-education-ddc76",
+    "storage_bucket": "octo-education-ddc76.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:79785327518:android:9318cb0bc1565bdd1d748f",
+        "android_client_info": {
+          "package_name": "com.octostars.student"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA_mBs6DqFhCEjuCDcc-PLb8LMlDxbqPEQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
