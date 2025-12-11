@@ -7,11 +7,7 @@ variable "region" {
 }
 
 # Service URLs for inter-service communication
-variable "cie_api_url" {
-  description = "CIE API service URL"
-  type        = string
-  default     = "https://cie-api-service-placeholder.run.app"
-}
+# Note: CIE API URL is now managed by Terraform module output
 
 variable "curriculum_api_url" {
   description = "Curriculum API service URL"
@@ -25,17 +21,7 @@ variable "auditor_service_url" {
   default     = "https://auditor-service-placeholder.run.app"
 }
 
-variable "math_mcp_url" {
-  description = "Math MCP service URL"
-  type        = string
-  default     = "https://math-expert-placeholder.run.app"
-}
-
-variable "physics_mcp_url" {
-  description = "Physics MCP service URL"
-  type        = string
-  default     = "https://physics-expert-placeholder.run.app"
-}
+# Note: Math and Physics MCP URLs are now managed by Terraform module outputs
 
 variable "chem_mcp_url" {
   description = "Chemistry MCP service URL"

@@ -28,9 +28,10 @@ resource "google_project_service" "services" {
 }
 
 ########################################
-# 3. SERVICE ACCOUNTS (AI Mentor Only)
+# 3. SERVICE ACCOUNTS
 ########################################
 
+# AI Mentor Service Account
 module "sa_ai_mentor" {
   source       = "../../modules/service_account"
   project_id   = local.project_id
@@ -45,13 +46,64 @@ module "sa_ai_mentor" {
   ]
 }
 
+# CIE API Service Account
+module "sa_cie_api" {
+  source       = "../../modules/service_account"
+  project_id   = local.project_id
+  account_id   = "sa-cie-api"
+  display_name = "CIE API Service Account"
+  project_roles = [
+    "roles/datastore.user",
+    "roles/aiplatform.user",
+    "roles/secretmanager.secretAccessor"
+  ]
+}
+
+# CIE Worker Service Account
+module "sa_cie_worker" {
+  source       = "../../modules/service_account"
+  project_id   = local.project_id
+  account_id   = "sa-cie-worker"
+  display_name = "CIE Worker Service Account"
+  project_roles = [
+    "roles/datastore.user",
+    "roles/pubsub.subscriber"
+  ]
+}
+
+# Mathematics Service Account
+module "sa_mathematic_service" {
+  source       = "../../modules/service_account"
+  project_id   = local.project_id
+  account_id   = "sa-mathematic-service"
+  display_name = "Mathematics Service Account"
+  project_roles = [
+    "roles/datastore.user",
+    "roles/run.invoker",
+    "roles/secretmanager.secretAccessor"
+  ]
+}
+
+# Physics Service Account
+module "sa_physics_service" {
+  source       = "../../modules/service_account"
+  project_id   = local.project_id
+  account_id   = "sa-physics-service"
+  display_name = "Physics Service Account"
+  project_roles = [
+    "roles/aiplatform.user",
+    "roles/secretmanager.secretAccessor",
+    "roles/datastore.user"
+  ]
+}
+
 ########################################
-# 4. CLOUD RUN SERVICES (AI Mentor Only)
+# 4. CLOUD RUN SERVICES
 ########################################
 
 # AI Mentor Service
 module "ai_mentor_service" {
-  source   = "../../modules/cloud_run_service"
+  source     = "../../modules/cloud_run_service"
   project_id = local.project_id
   region     = local.region
 
@@ -71,16 +123,141 @@ module "ai_mentor_service" {
     FIRESTORE_PROJECT_ID = "octo-education-ddc76"
     GEMINI_PROJECT_ID    = "octo-education-ddc76"
 
-    CIE_API_URL        = var.cie_api_url
-    CURRICULUM_API_URL = var.curriculum_api_url
+    CIE_API_URL         = module.cie_api_service.url
+    CURRICULUM_API_URL  = var.curriculum_api_url
     AUDITOR_SERVICE_URL = var.auditor_service_url
 
-    MATH_MCP_URL    = var.math_mcp_url
-    PHYSICS_MCP_URL = var.physics_mcp_url
+    MATH_MCP_URL    = module.mathematic_service.url
+    PHYSICS_MCP_URL = module.physics_gateway.url
     CHEM_MCP_URL    = var.chem_mcp_url
 
     FIRESTORE_COLLECTION = "mentor/sessions"
     MCP_ENABLED          = "true"
     GEMINI_ENABLED       = "true"
+  }
+}
+
+# CIE API Service
+module "cie_api_service" {
+  source     = "../../modules/cloud_run_service"
+  project_id = local.project_id
+  region     = local.region
+
+  name                  = "curriculum-intelligence-engine-api"
+  image                 = "us-central1-docker.pkg.dev/octo-education-ddc76/services/curriculum-intelligence-engine-api:latest"
+  service_account_email = module.sa_cie_api.email
+
+  cpu           = "1"
+  memory        = "512Mi"
+  concurrency   = 80
+  min_instances = 1
+  max_instances = 10
+  ingress       = "INGRESS_TRAFFIC_ALL"
+
+  env_vars = {
+    GOOGLE_CLOUD_PROJECT = "octo-education-ddc76"
+    FIRESTORE_PROJECT_ID = "octo-education-ddc76"
+    REDIS_ENABLED        = "false"
+  }
+}
+
+# CIE Worker Service
+module "cie_worker_service" {
+  source     = "../../modules/cloud_run_service"
+  project_id = local.project_id
+  region     = local.region
+
+  name                  = "curriculum-intelligence-engine-worker"
+  image                 = "us-central1-docker.pkg.dev/octo-education-ddc76/services/curriculum-intelligence-engine-worker:latest"
+  service_account_email = module.sa_cie_worker.email
+
+  cpu           = "1"
+  memory        = "512Mi"
+  concurrency   = 80
+  min_instances = 0
+  max_instances = 5
+  ingress       = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+
+  env_vars = {
+    GOOGLE_CLOUD_PROJECT = "octo-education-ddc76"
+    FIRESTORE_PROJECT_ID = "octo-education-ddc76"
+    REDIS_ENABLED        = "false"
+  }
+}
+
+# Mathematics Service (MCP Server)
+module "mathematic_service" {
+  source     = "../../modules/cloud_run_service"
+  project_id = local.project_id
+  region     = local.region
+
+  name                  = "mathematic-service"
+  image                 = "us-central1-docker.pkg.dev/octo-education-ddc76/services/mathematic-service:latest"
+  service_account_email = module.sa_mathematic_service.email
+
+  cpu           = "1"
+  memory        = "512Mi"
+  concurrency   = 80
+  min_instances = 0
+  max_instances = 5
+  ingress       = "INGRESS_TRAFFIC_ALL"
+
+  env_vars = {
+    GOOGLE_CLOUD_PROJECT = "octo-education-ddc76"
+    FIRESTORE_PROJECT_ID = "octo-education-ddc76"
+  }
+}
+
+# Physics Python Sidecar (gRPC Server)
+module "physics_python_sidecar" {
+  source     = "../../modules/cloud_run_service"
+  project_id = local.project_id
+  region     = local.region
+
+  name                  = "physics-python-sidecar"
+  image                 = "us-central1-docker.pkg.dev/octo-education-ddc76/services/physics-python-sidecar:latest"
+  service_account_email = module.sa_physics_service.email
+
+  cpu           = "2"
+  memory        = "1Gi"
+  concurrency   = 80
+  min_instances = 0
+  max_instances = 10
+  ingress       = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+
+  env_vars = {
+    GOOGLE_CLOUD_PROJECT = "octo-education-ddc76"
+    VERTEX_AI_PROJECT_ID = "octo-education-ddc76"
+    VERTEX_AI_LOCATION   = "us-central1"
+    VERTEX_AI_MODEL      = "gemini-2.0-flash-exp"
+    FIRESTORE_PROJECT_ID = "octo-education-ddc76"
+    USE_MOCK_LLM         = "false"
+    REDIS_ENABLED        = "false"
+    GRPC_PORT            = "50051"
+  }
+}
+
+# Physics Gateway (HTTP API)
+module "physics_gateway" {
+  source     = "../../modules/cloud_run_service"
+  project_id = local.project_id
+  region     = local.region
+
+  name                  = "physics-gateway"
+  image                 = "us-central1-docker.pkg.dev/octo-education-ddc76/services/physics-gateway:latest"
+  service_account_email = module.sa_physics_service.email
+
+  cpu           = "1"
+  memory        = "512Mi"
+  concurrency   = 80
+  min_instances = 0
+  max_instances = 10
+  ingress       = "INGRESS_TRAFFIC_ALL"
+
+  env_vars = {
+    ENVIRONMENT          = "production"
+    PYTHON_SIDECAR_ADDR  = "${module.physics_python_sidecar.url}:50051"
+    GOOGLE_CLOUD_PROJECT = "octo-education-ddc76"
+    REDIS_ENABLED        = "false"
   }
 }
