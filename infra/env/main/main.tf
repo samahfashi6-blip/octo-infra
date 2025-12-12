@@ -341,7 +341,7 @@ module "squad_service" {
   region     = local.region
 
   name                  = "squad-service"
-  image                 = "us-central1-docker.pkg.dev/octo-education-ddc76/services/squad-service:latest"
+  image                 = "us-central1-docker.pkg.dev/octo-education-ddc76/services/squad-service:e943f73"
   service_account_email = module.sa_squad_service.email
 
   cpu           = "1"
