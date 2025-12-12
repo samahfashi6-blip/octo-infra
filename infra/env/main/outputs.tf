@@ -101,3 +101,13 @@ output "curriculum_service_account_email" {
   description = "Email of the Curriculum Service account"
   value       = module.sa_curriculum_service.email
 }
+
+output "core_admin_webapp_url" {
+  description = "URL of the Core Admin Web App"
+  value       = module.core_admin_webapp.url
+}
+
+output "core_admin_webapp_service_account_email" {
+  description = "Email of the Core Admin Web App service account"
+  value       = module.sa_core_admin_webapp.email
+}

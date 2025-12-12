@@ -156,6 +156,19 @@ module "sa_curriculum_service" {
   ]
 }
 
+# Core Admin Web App Service Account
+module "sa_core_admin_webapp" {
+  source       = "../../modules/service_account"
+  project_id   = local.project_id
+  account_id   = "sa-core-admin-webapp"
+  display_name = "Core Admin Web App Service Account"
+  project_roles = [
+    "roles/logging.logWriter",
+    "roles/monitoring.metricWriter",
+    "roles/artifactregistry.writer"  # For CI/CD Docker image push
+  ]
+}
+
 ########################################
 # 4. CLOUD RUN SERVICES
 ########################################
@@ -456,5 +469,43 @@ module "curriculum_service" {
     PUBSUB_ENABLED                  = "true"
     AUTH_ENABLED                    = "true"
     ENVIRONMENT                     = "production"
+  }
+}
+
+# Core Admin Web App (Angular Frontend)
+module "core_admin_webapp" {
+  source     = "../../modules/cloud_run_service"
+  project_id = local.project_id
+  region     = local.region
+
+  name                  = "core-admin-webapp"
+  image                 = "us-central1-docker.pkg.dev/octo-education-ddc76/services/core-admin-webapp:latest"
+  service_account_email = module.sa_core_admin_webapp.email
+
+  cpu           = "1"
+  memory        = "512Mi"
+  concurrency   = 80
+  min_instances = 0
+  max_instances = 5
+  ingress       = "INGRESS_TRAFFIC_ALL"
+
+  env_vars = {
+    # Backend API URLs
+    API_CORE_ADMIN_URL    = module.core_admin_api.url
+    API_AI_MENTOR_URL     = module.ai_mentor_service.url
+    API_CURRICULUM_URL    = module.curriculum_service.url
+    API_CIE_URL           = module.cie_api_service.url
+    API_MATH_URL          = module.mathematic_service.url
+    API_PHYSICS_URL       = module.physics_gateway.url
+    API_CHEMISTRY_URL     = module.chemistry_gateway.url
+    API_SQUAD_URL         = module.squad_service.url
+
+    # Firebase configuration
+    FIREBASE_PROJECT_ID = "octo-education-ddc76"
+    
+    # Application settings
+    ENVIRONMENT   = "production"
+    APP_VERSION   = "1.0.0"
+    ENABLE_ANALYTICS = "true"
   }
 }

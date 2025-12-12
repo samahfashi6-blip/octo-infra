@@ -1,0 +1,133 @@
+name: Deploy Core Admin Web App to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+      - production
+    paths:
+      - 'src/**'
+      - 'package*.json'
+      - 'angular.json'
+      - '.github/workflows/deploy-admin-webapp.yml'
+      - 'deployment/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  PROJECT_ID: octo-education-ddc76
+  REGION: us-central1
+  SERVICE_NAME: core-admin-webapp
+  REPOSITORY: services
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy to Cloud Run
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker to use gcloud as credential helper
+        run: |
+          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+            -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:latest \
+            -f deployment/core-admin-webapp/Dockerfile \
+            .
+
+      - name: Push Docker image to Artifact Registry
+        run: |
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:latest
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+            --region=${{ env.REGION }} \
+            --platform=managed \
+            --allow-unauthenticated \
+            --service-account=sa-core-admin-webapp@${{ env.PROJECT_ID }}.iam.gserviceaccount.com \
+            --cpu=1 \
+            --memory=256Mi \
+            --min-instances=0 \
+            --max-instances=5 \
+            --concurrency=80 \
+            --timeout=60 \
+            --port=8080 \
+            --set-env-vars="ENVIRONMENT=production,APP_VERSION=${{ github.sha }},ENABLE_ANALYTICS=true" \
+            --labels="app=core-admin-webapp,managed-by=github-actions,commit-sha=${{ github.sha }}"
+
+      - name: Get Service URL
+        id: get-url
+        run: |
+          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region=${{ env.REGION }} \
+            --format='value(status.url)')
+          echo "url=$SERVICE_URL" >> $GITHUB_OUTPUT
+          echo "### Deployment Successful! 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Service URL:** $SERVICE_URL" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests..."
+          SERVICE_URL="${{ steps.get-url.outputs.url }}"
+          
+          # Wait for service to be ready
+          sleep 10
+          
+          # Test health endpoint
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" $SERVICE_URL/health)
+          if [ "$HTTP_CODE" -eq 200 ]; then
+            echo "✅ Health check passed"
+          else
+            echo "❌ Health check failed with code $HTTP_CODE"
+            exit 1
+          fi
+          
+          # Test main page
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" $SERVICE_URL/)
+          if [ "$HTTP_CODE" -eq 200 ]; then
+            echo "✅ Main page accessible"
+          else
+            echo "❌ Main page failed with code $HTTP_CODE"
+            exit 1
+          fi
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Deployment completed successfully"
+          else
+            echo "❌ Deployment failed"
+          fi

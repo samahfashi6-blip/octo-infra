@@ -17,6 +17,7 @@ All services are deployed on GCP Cloud Run and are accessible via HTTPS.
 | ---------------------- | ---------------------------------------------------- | ------------------------------------------ |
 | **AI Mentor Service**  | `https://ai-mentor-service-3dh2p4j4qq-uc.a.run.app`  | AI-powered mentoring and tutoring          |
 | **Core Admin API**     | `https://core-admin-api-3dh2p4j4qq-uc.a.run.app`     | Administrative API for system management   |
+| **Core Admin Web App** | `https://core-admin-webapp-3dh2p4j4qq-uc.a.run.app`  | Angular admin dashboard (frontend)         |
 | **Curriculum Service** | `https://curriculum-service-3dh2p4j4qq-uc.a.run.app` | Curriculum management and content delivery |
 
 ### **Intelligence Services**
