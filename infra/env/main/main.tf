@@ -19,7 +19,11 @@ resource "google_project_service" "services" {
     "firestore.googleapis.com",
     "secretmanager.googleapis.com",
     "logging.googleapis.com",
-    "monitoring.googleapis.com"
+    "monitoring.googleapis.com",
+    "cloudfunctions.googleapis.com",
+    "documentai.googleapis.com",
+    "storage.googleapis.com",
+    "cloudbuild.googleapis.com"
   ])
 
   project            = local.project_id
@@ -166,6 +170,24 @@ module "sa_core_admin_webapp" {
     "roles/logging.logWriter",
     "roles/monitoring.metricWriter",
     "roles/artifactregistry.writer"  # For CI/CD Docker image push
+  ]
+}
+
+# Curriculum Ingestion Service Account
+module "sa_curriculum_ingestion" {
+  source       = "../../modules/service_account"
+  project_id   = local.project_id
+  account_id   = "sa-curriculum-ingestion"
+  display_name = "Curriculum Ingestion Service Account"
+  project_roles = [
+    "roles/datastore.user",
+    "roles/storage.objectAdmin",
+    "roles/documentai.apiUser",
+    "roles/logging.logWriter",
+    "roles/run.invoker",              # To call curriculum service
+    "roles/cloudfunctions.developer", # To deploy Cloud Functions via GitHub Actions
+    "roles/iam.serviceAccountUser",   # To act as service account during deployment
+    "roles/artifactregistry.reader"   # To read container images during build
   ]
 }
 
@@ -507,5 +529,78 @@ module "core_admin_webapp" {
     ENVIRONMENT   = "production"
     APP_VERSION   = "1.0.0"
     ENABLE_ANALYTICS = "true"
+  }
+}
+
+########################################
+# 5. STORAGE BUCKETS
+########################################
+
+# Curriculum PDF Upload Bucket
+module "curriculum_pdf_uploads_bucket" {
+  source       = "../../modules/bucket"
+  project_id   = local.project_id
+  name         = "octo-education-ddc76-curriculum-pdfs"
+  location     = local.region
+  versioning   = false
+  delete_after_days = 0
+}
+
+# Curriculum Processing Results Bucket
+module "curriculum_processing_results_bucket" {
+  source       = "../../modules/bucket"
+  project_id   = local.project_id
+  name         = "octo-education-ddc76-curriculum-processing-results"
+  location     = local.region
+  versioning   = true
+  delete_after_days = 0
+}
+
+# Source code bucket for Cloud Function
+module "curriculum_function_source_bucket" {
+  source       = "../../modules/bucket"
+  project_id   = local.project_id
+  name         = "octo-education-ddc76-curriculum-function-source"
+  location     = local.region
+  versioning   = true
+  delete_after_days = 0
+}
+
+########################################
+# 6. CLOUD FUNCTIONS
+########################################
+
+# Curriculum Ingestion Function
+module "curriculum_ingestion_function" {
+  source     = "../../modules/cloud_function"
+  project_id = local.project_id
+  region     = local.region
+
+  name        = "curriculum-ingestion"
+  runtime     = "go121"
+  entry_point = "ProcessPDFUpload"
+
+  source_bucket = module.curriculum_function_source_bucket.name
+  source_object = "curriculum-ingestion-source.zip"
+
+  service_account_email = module.sa_curriculum_ingestion.email
+
+  memory          = "512Mi"
+  timeout_seconds = 540
+  max_instances   = 10
+  min_instances   = 0
+
+  trigger_config = {
+    event_type   = "google.cloud.storage.object.v1.finalized"
+    bucket       = module.curriculum_pdf_uploads_bucket.name
+    retry_policy = "RETRY_POLICY_RETRY"
+  }
+
+  env_vars = {
+    GCP_PROJECT_ID       = "octo-education-ddc76"
+    FIRESTORE_PROJECT_ID = "octo-education-ddc76"
+    CURRICULUM_API_URL   = module.curriculum_service.url
+    DOCUMENT_AI_PROCESSOR_ID = var.document_ai_processor_id
+    PROCESSING_RESULTS_BUCKET = module.curriculum_processing_results_bucket.name
   }
 }

@@ -111,3 +111,29 @@ output "core_admin_webapp_service_account_email" {
   description = "Email of the Core Admin Web App service account"
   value       = module.sa_core_admin_webapp.email
 }
+
+# Curriculum Ingestion Outputs
+output "curriculum_ingestion_function_name" {
+  description = "Name of the Curriculum Ingestion Cloud Function"
+  value       = module.curriculum_ingestion_function.function_name
+}
+
+output "curriculum_ingestion_service_account_email" {
+  description = "Email of the Curriculum Ingestion service account"
+  value       = module.sa_curriculum_ingestion.email
+}
+
+output "curriculum_pdf_uploads_bucket" {
+  description = "Name of the bucket for PDF uploads"
+  value       = module.curriculum_pdf_uploads_bucket.name
+}
+
+output "curriculum_processing_results_bucket" {
+  description = "Name of the bucket for processing results"
+  value       = module.curriculum_processing_results_bucket.name
+}
+
+output "curriculum_function_source_bucket" {
+  description = "Name of the bucket for Cloud Function source code"
+  value       = module.curriculum_function_source_bucket.name
+}
