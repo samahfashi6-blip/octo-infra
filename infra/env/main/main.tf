@@ -604,3 +604,16 @@ module "curriculum_ingestion_function" {
     PROCESSING_RESULTS_BUCKET = module.curriculum_processing_results_bucket.name
   }
 }
+
+########################################
+# 7. GITHUB WORKLOAD IDENTITY
+########################################
+
+# Curriculum Ingestion Workload Identity
+module "github_wif_curriculum_ingestion" {
+  source = "../../modules/github_workload_identity"
+
+  project_id          = local.project_id
+  service_account_id  = module.sa_curriculum_ingestion.id
+  github_repository   = "samahfashi6-blip/curriculum_ingestion"
+}

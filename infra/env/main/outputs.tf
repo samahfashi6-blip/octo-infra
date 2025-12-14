@@ -137,3 +137,16 @@ output "curriculum_function_source_bucket" {
   description = "Name of the bucket for Cloud Function source code"
   value       = module.curriculum_function_source_bucket.name
 }
+
+# Curriculum Ingestion Workload Identity Outputs
+output "curriculum_ingestion_workload_identity_provider" {
+  description = "Workload Identity Provider for Curriculum Ingestion GitHub Actions"
+  value       = module.github_wif_curriculum_ingestion.workload_identity_provider
+  sensitive   = false
+}
+
+output "curriculum_ingestion_github_service_account" {
+  description = "Service Account email for Curriculum Ingestion GitHub Actions"
+  value       = module.sa_curriculum_ingestion.email
+  sensitive   = false
+}
