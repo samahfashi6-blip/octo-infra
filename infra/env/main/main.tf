@@ -615,6 +615,14 @@ module "cie_objectives_subscription" {
   # PULL subscription - CIE worker uses subscription.Receive() polling
 }
 
+# Grant CIE worker permission to pull from subscription
+resource "google_pubsub_subscription_iam_member" "cie_worker_subscriber" {
+  project      = local.project_id
+  subscription = module.cie_objectives_subscription.name
+  role         = "roles/pubsub.subscriber"
+  member       = "serviceAccount:${module.sa_cie_worker.email}"
+}
+
 ########################################
 # 6. CLOUD FUNCTIONS
 ########################################
