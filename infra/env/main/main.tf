@@ -191,6 +191,22 @@ module "sa_curriculum_ingestion" {
   ]
 }
 
+# GitHub Actions Service Account
+module "sa_github_actions" {
+  source       = "../../modules/service_account"
+  project_id   = local.project_id
+  account_id   = "github-actions"
+  display_name = "GitHub Actions CI/CD"
+  description  = "Service account for GitHub Actions to deploy CIE services"
+  project_roles = [
+    "roles/cloudbuild.builds.editor",
+    "roles/run.admin",
+    "roles/iam.serviceAccountUser",
+    "roles/serviceusage.serviceUsageConsumer",
+    "roles/storage.admin"
+  ]
+}
+
 ########################################
 # 4. CLOUD RUN SERVICES
 ########################################
@@ -273,9 +289,10 @@ module "cie_worker_service" {
   ingress       = "INGRESS_TRAFFIC_INTERNAL_ONLY"
 
   env_vars = {
-    GOOGLE_CLOUD_PROJECT = "octo-education-ddc76"
-    FIRESTORE_PROJECT_ID = "octo-education-ddc76"
-    REDIS_ENABLED        = "false"
+    GOOGLE_CLOUD_PROJECT   = "octo-education-ddc76"
+    FIRESTORE_PROJECT_ID   = "octo-education-ddc76"
+    REDIS_ENABLED          = "false"
+    PUBSUB_SUBSCRIPTION_ID = module.cie_objectives_subscription.id
   }
 }
 
@@ -567,6 +584,37 @@ module "curriculum_function_source_bucket" {
 }
 
 ########################################
+# 5. PUBSUB
+########################################
+
+module "curriculum_objectives_topic" {
+  source     = "../../modules/pubsub_topic"
+  project_id = local.project_id
+  name       = "curriculum-objectives-created"
+  labels = {
+    service     = "curriculum-ingestion"
+    environment = "production"
+  }
+}
+
+resource "google_pubsub_topic_iam_member" "curriculum_ingestion_publisher" {
+  project = local.project_id
+  topic   = module.curriculum_objectives_topic.name
+  role    = "roles/pubsub.publisher"
+  member  = "serviceAccount:${module.sa_curriculum_ingestion.email}"
+}
+
+module "cie_objectives_subscription" {
+  source               = "../../modules/pubsub_subscription"
+  project_id           = local.project_id
+  name                 = "cie-objectives-subscription"
+  topic                = module.curriculum_objectives_topic.name
+  ack_deadline_seconds = 600
+  min_retry_backoff    = "10s"
+  max_retry_backoff    = "600s"
+}
+
+########################################
 # 6. CLOUD FUNCTIONS
 ########################################
 
@@ -577,7 +625,7 @@ module "curriculum_ingestion_function" {
   region     = local.region
 
   name        = "curriculum-ingestion"
-  runtime     = "go121"
+  runtime     = "go125"
   entry_point = "ProcessPDFUpload"
 
   source_bucket = module.curriculum_function_source_bucket.name
@@ -597,11 +645,16 @@ module "curriculum_ingestion_function" {
   }
 
   env_vars = {
+    PROJECT_ID           = "octo-education-ddc76"
     GCP_PROJECT_ID       = "octo-education-ddc76"
     FIRESTORE_PROJECT_ID = "octo-education-ddc76"
     CURRICULUM_API_URL   = module.curriculum_service.url
     DOCUMENT_AI_PROCESSOR_ID = var.document_ai_processor_id
+    DOCUMENT_AI_LOCATION = "us"
     PROCESSING_RESULTS_BUCKET = module.curriculum_processing_results_bucket.name
+    PUBSUB_TOPIC_ID      = module.curriculum_objectives_topic.id
+    GEMINI_MODEL_ID      = "gemini-2.5-pro"
+    GEMINI_LOCATION      = "us-central1"
   }
 }
 
@@ -616,4 +669,28 @@ module "github_wif_curriculum_ingestion" {
   project_id          = local.project_id
   service_account_id  = module.sa_curriculum_ingestion.id
   github_repository   = "samahfashi6-blip/curriculum_ingestion"
+}
+
+########################################
+# 8. CI/CD IAM CONFIGURATION
+########################################
+
+# Cloud Build Default SA Needs actAs Permissions
+resource "google_service_account_iam_member" "cloudbuild_actas_cie_api" {
+  service_account_id = module.sa_cie_api.id
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:79785327518-compute@developer.gserviceaccount.com"
+}
+
+resource "google_service_account_iam_member" "cloudbuild_actas_cie_worker" {
+  service_account_id = module.sa_cie_worker.id
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:79785327518-compute@developer.gserviceaccount.com"
+}
+
+# Storage Bucket IAM
+resource "google_storage_bucket_iam_member" "github_actions_cloudbuild_bucket" {
+  bucket = "octo-education-ddc76_cloudbuild"
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${module.sa_github_actions.email}"
 }
