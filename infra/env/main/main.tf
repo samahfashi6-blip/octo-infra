@@ -612,6 +612,7 @@ module "cie_objectives_subscription" {
   ack_deadline_seconds = 600
   min_retry_backoff    = "10s"
   max_retry_backoff    = "600s"
+  # PULL subscription - CIE worker uses subscription.Receive() polling
 }
 
 ########################################
