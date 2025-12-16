@@ -289,6 +289,15 @@ resource "google_cloud_run_v2_service_iam_member" "curriculum_invoke_cie_api" {
   member   = "serviceAccount:${module.sa_curriculum_service.email}"
 }
 
+# Allow curriculum-ingestion function to invoke curriculum-service
+resource "google_cloud_run_v2_service_iam_member" "ingestion_invoke_curriculum" {
+  project  = local.project_id
+  location = local.region
+  name     = "curriculum-service"
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${module.sa_curriculum_ingestion.email}"
+}
+
 # CIE Worker Service - DEPRECATED (API migration)
 # DEPRECATED: Worker service no longer needed with API-based architecture
 # Migration Date: December 16, 2025
