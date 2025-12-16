@@ -18,7 +18,7 @@ variable "auditor_service_url" {
 variable "document_ai_processor_id" {
   description = "Document AI Processor ID for OCR processing"
   type        = string
-  default     = "PLACEHOLDER_PROCESSOR_ID"  # Update after creating processor in GCP Console
+  default     = "PLACEHOLDER_PROCESSOR_ID" # Update after creating processor in GCP Console
 }
 
 # Note: Math, Physics, and Chemistry MCP URLs are now managed by Terraform module outputs

@@ -169,7 +169,7 @@ module "sa_core_admin_webapp" {
   project_roles = [
     "roles/logging.logWriter",
     "roles/monitoring.metricWriter",
-    "roles/artifactregistry.writer"  # For CI/CD Docker image push
+    "roles/artifactregistry.writer" # For CI/CD Docker image push
   ]
 }
 
@@ -271,7 +271,22 @@ module "cie_api_service" {
   }
 }
 
-# CIE Worker Service
+# Allow curriculum-ingestion function to invoke CIE API
+resource "google_cloud_run_v2_service_iam_member" "ingestion_invoke_cie_api" {
+  project  = local.project_id
+  location = local.region
+  name     = "curriculum-intelligence-engine-api"
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${module.sa_curriculum_ingestion.email}"
+}
+
+# CIE Worker Service - DEPRECATED (API migration)
+# DEPRECATED: Worker service no longer needed with API-based architecture
+# Migration Date: December 16, 2025
+# Reason: Pub/Sub polling replaced by direct API calls to cie_api_service
+# Resource can be deleted after production verification:
+# terraform destroy -target=module.cie_worker_service
+/*
 module "cie_worker_service" {
   source     = "../../modules/cloud_run_service"
   project_id = local.project_id
@@ -284,7 +299,7 @@ module "cie_worker_service" {
   cpu           = "1"
   memory        = "512Mi"
   concurrency   = 80
-  min_instances = 0
+  min_instances = 1
   max_instances = 5
   ingress       = "INGRESS_TRAFFIC_INTERNAL_ONLY"
 
@@ -292,9 +307,10 @@ module "cie_worker_service" {
     GOOGLE_CLOUD_PROJECT   = "octo-education-ddc76"
     FIRESTORE_PROJECT_ID   = "octo-education-ddc76"
     REDIS_ENABLED          = "false"
-    PUBSUB_SUBSCRIPTION_ID = module.cie_objectives_subscription.id
+    PUBSUB_SUBSCRIPTION_ID = "cie-objectives-subscription"
   }
 }
+*/
 
 # Mathematics Service (MCP Server)
 module "mathematic_service" {
@@ -530,21 +546,21 @@ module "core_admin_webapp" {
 
   env_vars = {
     # Backend API URLs
-    API_CORE_ADMIN_URL    = module.core_admin_api.url
-    API_AI_MENTOR_URL     = module.ai_mentor_service.url
-    API_CURRICULUM_URL    = module.curriculum_service.url
-    API_CIE_URL           = module.cie_api_service.url
-    API_MATH_URL          = module.mathematic_service.url
-    API_PHYSICS_URL       = module.physics_gateway.url
-    API_CHEMISTRY_URL     = module.chemistry_gateway.url
-    API_SQUAD_URL         = module.squad_service.url
+    API_CORE_ADMIN_URL = module.core_admin_api.url
+    API_AI_MENTOR_URL  = module.ai_mentor_service.url
+    API_CURRICULUM_URL = module.curriculum_service.url
+    API_CIE_URL        = module.cie_api_service.url
+    API_MATH_URL       = module.mathematic_service.url
+    API_PHYSICS_URL    = module.physics_gateway.url
+    API_CHEMISTRY_URL  = module.chemistry_gateway.url
+    API_SQUAD_URL      = module.squad_service.url
 
     # Firebase configuration
     FIREBASE_PROJECT_ID = "octo-education-ddc76"
-    
+
     # Application settings
-    ENVIRONMENT   = "production"
-    APP_VERSION   = "1.0.0"
+    ENVIRONMENT      = "production"
+    APP_VERSION      = "1.0.0"
     ENABLE_ANALYTICS = "true"
   }
 }
@@ -555,38 +571,51 @@ module "core_admin_webapp" {
 
 # Curriculum PDF Upload Bucket
 module "curriculum_pdf_uploads_bucket" {
-  source       = "../../modules/bucket"
-  project_id   = local.project_id
-  name         = "octo-education-ddc76-curriculum-pdfs"
-  location     = local.region
-  versioning   = false
+  source            = "../../modules/bucket"
+  project_id        = local.project_id
+  name              = "octo-education-ddc76-curriculum-pdfs"
+  location          = local.region
+  versioning        = false
   delete_after_days = 0
 }
 
 # Curriculum Processing Results Bucket
 module "curriculum_processing_results_bucket" {
-  source       = "../../modules/bucket"
-  project_id   = local.project_id
-  name         = "octo-education-ddc76-curriculum-processing-results"
-  location     = local.region
-  versioning   = true
+  source            = "../../modules/bucket"
+  project_id        = local.project_id
+  name              = "octo-education-ddc76-curriculum-processing-results"
+  location          = local.region
+  versioning        = true
   delete_after_days = 0
 }
 
 # Source code bucket for Cloud Function
 module "curriculum_function_source_bucket" {
-  source       = "../../modules/bucket"
-  project_id   = local.project_id
-  name         = "octo-education-ddc76-curriculum-function-source"
-  location     = local.region
-  versioning   = true
+  source            = "../../modules/bucket"
+  project_id        = local.project_id
+  name              = "octo-education-ddc76-curriculum-function-source"
+  location          = local.region
+  versioning        = true
   delete_after_days = 0
 }
 
 ########################################
-# 5. PUBSUB
+# 5. PUBSUB - DEPRECATED (Migrated to API-based architecture)
 ########################################
 
+# DEPRECATED: Pub/Sub resources no longer needed after API migration
+# Migration Date: December 16, 2025
+# Reason: Direct API calls are simpler and more appropriate for synchronous workflows
+# Reference: API_MIGRATION_PLAN.md and TERRAFORM_UPDATE_REQUEST_API_MIGRATION.md
+#
+# Resources can be permanently deleted after production verification:
+# terraform destroy -target=google_pubsub_subscription_iam_member.cie_worker_subscriber
+# terraform destroy -target=module.cie_objectives_subscription
+# terraform destroy -target=google_pubsub_topic_iam_member.curriculum_ingestion_publisher
+# terraform destroy -target=module.curriculum_objectives_topic
+# gcloud pubsub subscriptions delete cie-curriculum-updates --project=octo-education-ddc76
+
+/*
 module "curriculum_objectives_topic" {
   source     = "../../modules/pubsub_topic"
   project_id = local.project_id
@@ -612,16 +641,15 @@ module "cie_objectives_subscription" {
   ack_deadline_seconds = 600
   min_retry_backoff    = "10s"
   max_retry_backoff    = "600s"
-  # PULL subscription - CIE worker uses subscription.Receive() polling
 }
 
-# Grant CIE worker permission to pull from subscription
 resource "google_pubsub_subscription_iam_member" "cie_worker_subscriber" {
   project      = local.project_id
   subscription = module.cie_objectives_subscription.name
   role         = "roles/pubsub.subscriber"
   member       = "serviceAccount:${module.sa_cie_worker.email}"
 }
+*/
 
 ########################################
 # 6. CLOUD FUNCTIONS
@@ -654,16 +682,16 @@ module "curriculum_ingestion_function" {
   }
 
   env_vars = {
-    PROJECT_ID           = "octo-education-ddc76"
-    GCP_PROJECT_ID       = "octo-education-ddc76"
-    FIRESTORE_PROJECT_ID = "octo-education-ddc76"
-    CURRICULUM_API_URL   = module.curriculum_service.url
-    DOCUMENT_AI_PROCESSOR_ID = var.document_ai_processor_id
-    DOCUMENT_AI_LOCATION = "us"
+    PROJECT_ID                = "octo-education-ddc76"
+    GCP_PROJECT_ID            = "octo-education-ddc76"
+    FIRESTORE_PROJECT_ID      = "octo-education-ddc76"
+    CURRICULUM_API_URL        = module.curriculum_service.url
+    CIE_API_URL               = module.cie_api_service.url
+    DOCUMENT_AI_PROCESSOR_ID  = var.document_ai_processor_id
+    DOCUMENT_AI_LOCATION      = "us"
     PROCESSING_RESULTS_BUCKET = module.curriculum_processing_results_bucket.name
-    PUBSUB_TOPIC_ID      = module.curriculum_objectives_topic.id
-    GEMINI_MODEL_ID      = "gemini-2.5-pro"
-    GEMINI_LOCATION      = "us-central1"
+    GEMINI_MODEL_ID           = "gemini-2.5-pro"
+    GEMINI_LOCATION           = "us-central1"
   }
 }
 
@@ -675,9 +703,9 @@ module "curriculum_ingestion_function" {
 module "github_wif_curriculum_ingestion" {
   source = "../../modules/github_workload_identity"
 
-  project_id          = local.project_id
-  service_account_id  = module.sa_curriculum_ingestion.id
-  github_repository   = "samahfashi6-blip/curriculum_ingestion"
+  project_id         = local.project_id
+  service_account_id = module.sa_curriculum_ingestion.id
+  github_repository  = "samahfashi6-blip/curriculum_ingestion"
 }
 
 ########################################

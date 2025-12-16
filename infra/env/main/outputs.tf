@@ -17,16 +17,19 @@ output "cie_api_service_url" {
   value       = module.cie_api_service.url
 }
 
-output "cie_worker_service_url" {
-  description = "URL of the CIE Worker service"
-  value       = module.cie_worker_service.url
-}
+# DEPRECATED: Worker service output (API migration)
+# output "cie_worker_service_url" {
+#   description = "URL of the CIE Worker service"
+#   value       = module.cie_worker_service.url
+# }
 
 output "cie_api_service_account_email" {
   description = "Email of the CIE API service account"
   value       = module.sa_cie_api.email
 }
 
+# DEPRECATED: Worker service account output (API migration)
+# Note: Service account kept active for potential future use
 output "cie_worker_service_account_email" {
   description = "Email of the CIE Worker service account"
   value       = module.sa_cie_worker.email
