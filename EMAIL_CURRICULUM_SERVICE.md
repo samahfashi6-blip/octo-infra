@@ -1,43 +1,34 @@
-# 📧 To: Curriculum Service Team
+# 📧 Action Required: Redeploy Curriculum Service
 
-**Subject:** 🚀 Infrastructure Updated - ACTION REQUIRED: Force Redeploy for Phase 2
-
-**Date:** December 16, 2025
+**To:** Curriculum Service Team
+**From:** Infrastructure Team
+**Subject:** 🚀 API Migration Ready - Force Image Update Required
 
 ---
 
-## Status: INFRASTRUCTURE UPDATED
+## Status: Infrastructure Ready ✅
 
-We have applied all requested Terraform changes for the Phase 2 (No Pub/Sub) migration.
+The infrastructure changes for Phase 2 (API Migration) are complete.
+- **IAM:** Your service account `sa-curriculum-service` has permission to invoke the CIE API.
+- **Config:** `PUBSUB_ENABLED` is set to `false`. `CIE_API_URL` is configured.
+- **Cleanup:** `roles/pubsub.publisher` has been removed.
 
-### ✅ What We've Done:
-1. **IAM:** Added `roles/run.invoker` for your service to call CIE API.
-2. **IAM:** Removed `roles/pubsub.publisher` (no longer needed).
-3. **Config:** Set `PUBSUB_ENABLED=false` and verified `CIE_API_URL`.
-4. **Cleanup:** Removed old Pub/Sub resources.
+## ⚠️ Action Required: Force Update
 
-### 🚨 CRITICAL ACTION REQUIRED: Force Image Update
+Your latest code (Phase 2) is in Artifact Registry, but Cloud Run is likely still running the cached Phase 1 image. You must force an update to pull the new code.
 
-Although your new code (Phase 2) is in Artifact Registry, **Cloud Run is likely still running the old cached image**.
-
-You must force Cloud Run to pull the latest image:
-
-**Option 1: Command Line (Fastest)**
+### Deployment Command
 ```bash
+# Force Cloud Run to pull the latest image from Artifact Registry
 gcloud run services update curriculum-service --region=us-central1
 ```
 
-**Option 2: Trigger CI/CD**
-- Re-run your deployment pipeline in GitHub Actions.
-
-### 🔍 Why is this necessary?
-Cloud Run caches the `:latest` tag. Without a force update or new revision, it won't know that the image content in the registry has changed to the new Phase 2 code.
-
-### 🧪 Verification
-Check your logs to ensure `PUBSUB_ENABLED` is false and API calls are working:
-```bash
-gcloud run services logs read curriculum-service --region=us-central1 --limit=20
-```
+### Verification Steps
+1. Check logs to confirm startup with `PUBSUB_ENABLED=false`:
+   ```bash
+   gcloud run services logs read curriculum-service --region=us-central1 --limit=20
+   ```
+2. Verify API calls to CIE are working (instead of Pub/Sub publishing).
 
 ---
 **Infrastructure Team**

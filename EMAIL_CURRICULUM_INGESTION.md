@@ -1,38 +1,39 @@
-# 📧 To: Curriculum Ingestion Team
+# 📧 Action Required: Redeploy Curriculum Ingestion Function
 
-**Subject:** ✅ Infrastructure Ready - Proceed with API Migration Deployment
-
-**Date:** December 16, 2025
+**To:** Curriculum Ingestion Team
+**From:** Infrastructure Team
+**Subject:** 🚀 API Migration Ready - Please Redeploy
 
 ---
 
-## Status: READY FOR DEPLOYMENT
+## Status: Infrastructure Ready ✅
 
 The infrastructure changes for the API migration are complete.
+- **IAM:** Your service account `sa-curriculum-ingestion` now has permission to invoke the CIE API.
+- **Config:** The `CIE_API_URL` environment variable has been set.
+- **Cleanup:** Pub/Sub topics and subscriptions have been removed.
 
-### ✅ What We've Done:
-1. **Environment Variables:** Updated `curriculum-ingestion` function with `CIE_API_URL`.
-2. **IAM Permissions:** Granted your service account (`sa-curriculum-ingestion`) permission to invoke the CIE API.
-3. **Cleanup:** Removed old Pub/Sub topics and subscriptions.
+## ⚠️ Action Required: Redeploy
 
-### 🚀 Action Required: Deploy Your Code
+Please redeploy your Cloud Function to ensure it picks up the latest configuration and code changes.
 
-Since your service is a **Cloud Function**, you need to trigger a deployment to ensure the running instance is using your latest code (which uses the API instead of Pub/Sub).
-
-**If deploying via CLI:**
+### Deployment Command
 ```bash
-./deploy-function.sh
+gcloud functions deploy curriculum-ingestion \
+  --region=us-central1 \
+  --gen2 \
+  --source=. \
+  --trigger-event-filters="type=google.cloud.storage.object.v1.finalized" \
+  --trigger-event-filters="bucket=octo-education-ddc76-curriculum-pdfs"
 ```
 
-**If deploying via GitHub Actions:**
-- Push your latest changes to the `main` branch.
-- Ensure the workflow completes successfully.
-
-### 🔍 Verification
-After deployment, check your logs to confirm successful API calls:
-```bash
-gcloud functions logs read curriculum-ingestion --region=us-central1 --gen2 --limit=20
-```
+### Verification Steps
+1. Upload a test PDF to `gs://octo-education-ddc76-curriculum-pdfs/`
+2. Check logs to confirm successful API call:
+   ```bash
+   gcloud functions logs read curriculum-ingestion --region=us-central1 --limit=20
+   ```
+3. Look for "Successfully called CIE API" (or similar success message from your code).
 
 ---
 **Infrastructure Team**

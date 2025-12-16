@@ -1,37 +1,33 @@
-# 📧 To: CIE Service Team
+# 📧 Action Required: Redeploy CIE Service
 
-**Subject:** ✅ Infrastructure Updates Complete - API Access Configured
-
-**Date:** December 16, 2025
+**To:** CIE Development Team
+**From:** Infrastructure Team
+**Subject:** 🚀 API Migration Ready - Service Update
 
 ---
 
-## Status: COMPLETED
+## Status: Infrastructure Ready ✅
 
-We have finished configuring the IAM permissions required for the new API-based architecture.
+The infrastructure is fully configured for the synchronous API architecture.
+- **IAM:** Ingestion and Curriculum services are authorized to call your API.
+- **Cleanup:** The worker service and Pub/Sub subscriptions have been decommissioned.
 
-### ✅ What We've Done:
-1. **Incoming Access:** Granted `roles/run.invoker` to:
-   - `curriculum-ingestion` (Cloud Function)
-   - `curriculum-service` (Cloud Run)
-2. **Cleanup:** Removed the deprecated Worker Service and Pub/Sub infrastructure.
+## ⚠️ Action Required: Ensure Latest Code
 
-### 🚀 Recommended Action: Redeploy
+Please ensure the running CIE API service is using the latest image that handles the synchronous processing logic.
 
-If you have pushed new code to Artifact Registry (e.g., removing Pub/Sub listeners or updating API logic), please force a redeployment to ensure the latest image is running.
-
-**Command:**
+### Deployment Command
 ```bash
+# Force Cloud Run to pull the latest image from Artifact Registry
 gcloud run services update curriculum-intelligence-engine-api --region=us-central1
 ```
 
-### 🔍 Monitoring
-You should start seeing incoming HTTP requests from the Ingestion function and Curriculum Service on your API endpoints.
-
-Monitor your logs here:
-```bash
-gcloud run services logs read curriculum-intelligence-engine-api --region=us-central1
-```
+### Verification Steps
+1. Monitor logs for incoming requests from Ingestion and Curriculum services:
+   ```bash
+   gcloud run services logs read curriculum-intelligence-engine-api --region=us-central1 --limit=50
+   ```
+2. Verify `POST /api/v1/objectives/process` requests are being handled successfully (200 OK).
 
 ---
 **Infrastructure Team**
