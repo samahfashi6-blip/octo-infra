@@ -280,6 +280,15 @@ resource "google_cloud_run_v2_service_iam_member" "ingestion_invoke_cie_api" {
   member   = "serviceAccount:${module.sa_curriculum_ingestion.email}"
 }
 
+# Allow curriculum-service to invoke CIE API
+resource "google_cloud_run_v2_service_iam_member" "curriculum_invoke_cie_api" {
+  project  = local.project_id
+  location = local.region
+  name     = "curriculum-intelligence-engine-api"
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${module.sa_curriculum_service.email}"
+}
+
 # CIE Worker Service - DEPRECATED (API migration)
 # DEPRECATED: Worker service no longer needed with API-based architecture
 # Migration Date: December 16, 2025
@@ -521,7 +530,7 @@ module "curriculum_service" {
     PUBSUB_TOPIC_CURRICULUM_UPDATED = "curriculum.objective.updated"
     CIE_API_URL                     = module.cie_api_service.url
     CIE_API_ENABLED                 = "true"
-    PUBSUB_ENABLED                  = "true"
+    PUBSUB_ENABLED                  = "false"
     AUTH_ENABLED                    = "true"
     ENVIRONMENT                     = "production"
   }
