@@ -16,6 +16,7 @@ All infrastructure changes have been successfully applied and verified. The API-
 ## Critical Information for Your Deployment Scripts
 
 ### CIE API Service URL
+
 ```
 CIE_API_URL=https://curriculum-intelligence-engine-api-3dh2p4j4qq-uc.a.run.app
 ```
@@ -23,11 +24,13 @@ CIE_API_URL=https://curriculum-intelligence-engine-api-3dh2p4j4qq-uc.a.run.app
 **Action Required:** Update your deployment scripts with this URL:
 
 1. **In `deploy-function.sh`:**
+
 ```bash
 --set-env-vars="CIE_API_URL=https://curriculum-intelligence-engine-api-3dh2p4j4qq-uc.a.run.app" \
 ```
 
 2. **In `.github/workflows/deploy.yml`:**
+
 ```yaml
 env:
   CIE_API_URL: "https://curriculum-intelligence-engine-api-3dh2p4j4qq-uc.a.run.app"
@@ -40,11 +43,13 @@ env:
 ## Infrastructure Changes Completed
 
 ### ✅ Resources Created
+
 - **IAM Binding:** `sa-curriculum-ingestion` → `roles/run.invoker` on CIE API
   - Your service account can now invoke the CIE API service
 - **Environment Variable:** `CIE_API_URL` added to curriculum-ingestion function
 
 ### ✅ Resources Removed
+
 - **Pub/Sub Topic:** `curriculum-objectives-created` (deleted)
 - **Pub/Sub Subscription:** `cie-objectives-subscription` (deleted)
 - **Manual Subscription:** `cie-curriculum-updates` (deleted)
@@ -52,6 +57,7 @@ env:
 - **Environment Variable:** `PUBSUB_TOPIC_ID` removed from function
 
 ### ✅ Verification Completed
+
 ```bash
 # Function environment variables confirmed:
 ✓ CIE_API_URL present
@@ -71,9 +77,11 @@ env:
 ## Next Steps for Your Team
 
 ### 1. Update Your Code (Immediate)
+
 Follow the code changes outlined in [API_MIGRATION_PLAN.md](./API_MIGRATION_PLAN.md), Phase 2:
 
 **In `pkg/objectives/processor.go`:**
+
 ```go
 // Remove Pub/Sub client initialization
 // Add:
@@ -116,6 +124,7 @@ if resp.StatusCode != http.StatusOK {
 ```
 
 ### 2. Deploy Your Changes
+
 ```bash
 # Run your existing deployment process
 ./deploy-function.sh
@@ -126,11 +135,13 @@ git push origin main  # if using GitHub Actions
 ### 3. Test End-to-End Flow
 
 **Upload a test PDF:**
+
 ```bash
 gsutil cp test-curriculum.pdf gs://octo-education-ddc76-curriculum-pdfs/
 ```
 
 **Monitor logs in real-time:**
+
 ```bash
 # Curriculum ingestion function logs
 gcloud functions logs read curriculum-ingestion \
@@ -145,6 +156,7 @@ gcloud run services logs read curriculum-intelligence-engine-api \
 ```
 
 **Verify success:**
+
 1. ✓ Ingestion function logs show: "Successfully called CIE API" or status 200
 2. ✓ CIE API logs show: `POST /api/v1/objectives/process`
 3. ✓ Firestore collection `curriculums/{id}/objectives` has new documents
@@ -153,14 +165,17 @@ gcloud run services logs read curriculum-intelligence-engine-api \
 ### 4. Troubleshooting Guide
 
 **If you see "403 Forbidden":**
+
 - Verify service account attached to function: `sa-curriculum-ingestion`
 - Check IAM binding exists (we've already verified this)
 
 **If you see "timeout":**
+
 - CIE API has 60s timeout configured
 - Check CIE API logs for processing issues
 
 **If objectives don't appear in Firestore:**
+
 - Check CIE API logs for Firestore write errors
 - Verify Gemini API is responding (check for API quota issues)
 
@@ -201,6 +216,7 @@ Infrastructure team is monitoring logs and available for immediate support durin
 ## Verification Checklist
 
 Before you start testing, confirm:
+
 - [ ] You have the CIE_API_URL value: `https://curriculum-intelligence-engine-api-3dh2p4j4qq-uc.a.run.app`
 - [ ] Your deployment scripts are updated with CIE_API_URL
 - [ ] Your code changes are ready to deploy
@@ -208,6 +224,7 @@ Before you start testing, confirm:
 - [ ] You know how to check function and API logs
 
 Once you've completed testing, please reply with:
+
 - ✓ Deployment successful
 - ✓ Test PDFs processed successfully
 - ✓ Objectives visible in Firestore
