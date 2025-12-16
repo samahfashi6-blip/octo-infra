@@ -155,8 +155,8 @@ module "sa_curriculum_service" {
   display_name = "Curriculum Service Account"
   project_roles = [
     "roles/datastore.user",
-    "roles/storage.objectAdmin",
-    "roles/pubsub.publisher"
+    "roles/storage.objectAdmin"
+    # roles/pubsub.publisher removed - API migration (Dec 16, 2025)
   ]
 }
 
