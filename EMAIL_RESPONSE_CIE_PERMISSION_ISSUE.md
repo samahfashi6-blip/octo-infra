@@ -16,6 +16,7 @@ We verified the infrastructure configuration and everything appears correct:
 
 1.  **IAM Binding Exists:**
     The service account `sa-curriculum-ingestion@octo-education-ddc76.iam.gserviceaccount.com` **DOES** have `roles/run.invoker` on the CIE API.
+
     ```bash
     $ gcloud run services get-iam-policy curriculum-intelligence-engine-api ...
     "serviceAccount:sa-curriculum-ingestion@octo-education-ddc76.iam.gserviceaccount.com"
@@ -34,8 +35,8 @@ Since the infrastructure configuration is correct, the 403 error might be caused
 1.  **Token Audience Mismatch:**
     Ensure your code is generating the ID token with the **exact** audience URL of the CIE API service:
     `https://curriculum-intelligence-engine-api-3dh2p4j4qq-uc.a.run.app`
-    
-    *If your code uses a trailing slash or different protocol in the audience claim, the token will be rejected.*
+
+    _If your code uses a trailing slash or different protocol in the audience claim, the token will be rejected._
 
 2.  **Token Generation Issue:**
     Verify that `idtoken.NewClient` is successfully retrieving a token.

@@ -14,11 +14,13 @@ Excellent investigation! We've verified the configuration and found the root cau
 ## ✅ URL Confirmation
 
 The **correct** CIE API URL is:
+
 ```
 https://curriculum-intelligence-engine-api-3dh2p4j4qq-uc.a.run.app
 ```
 
 We verified this is the active service in production:
+
 ```bash
 $ gcloud run services describe curriculum-intelligence-engine-api --region=us-central1
 https://curriculum-intelligence-engine-api-3dh2p4j4qq-uc.a.run.app
@@ -41,6 +43,7 @@ We analyzed the CIE API logs and found:
 ## 🎯 The Real Problem
 
 Your code implementation is **100% correct**:
+
 - ✅ Using `idtoken.NewClient` with correct audience
 - ✅ Calling the right URL
 - ✅ Using POST method
@@ -48,6 +51,7 @@ Your code implementation is **100% correct**:
 **The issue is in the CIE API service code**, not your ingestion function or infrastructure.
 
 ### Evidence from CIE API Logs:
+
 ```
 2025-12-16 10:53:04 POST 403 /api/v1/objectives/process
 2025-12-16 10:53:04 [GIN] | 403 | 566.574µs | POST /api/v1/objectives/process
@@ -60,6 +64,7 @@ The request is reaching the CIE API service, but something in their middleware i
 We are notifying the CIE Development Team that their API service has an authentication middleware issue:
 
 **Possible causes:**
+
 1. Their authentication middleware is incorrectly validating the ID token
 2. They're checking for a specific claim that doesn't exist in service-to-service tokens
 3. They have IP/network restrictions that block Cloud Function IPs
@@ -76,6 +81,7 @@ We'll keep you updated on the resolution.
 **Infrastructure Team**
 
 ### For Reference:
+
 - Correct URL: `https://curriculum-intelligence-engine-api-3dh2p4j4qq-uc.a.run.app`
 - Your IAM permission: ✅ Confirmed
 - Your service account: ✅ Correct
