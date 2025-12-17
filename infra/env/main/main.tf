@@ -260,7 +260,7 @@ module "cie_api_service" {
   cpu           = "1"
   memory        = "512Mi"
   concurrency   = 80
-  min_instances = 1
+  min_instances = 0
   max_instances = 10
   ingress       = "INGRESS_TRAFFIC_ALL"
 
