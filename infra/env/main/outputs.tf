@@ -144,7 +144,7 @@ output "curriculum_function_source_bucket" {
 # Curriculum Ingestion Workload Identity Outputs
 output "curriculum_ingestion_workload_identity_provider" {
   description = "Workload Identity Provider for Curriculum Ingestion GitHub Actions"
-  value       = module.github_wif_curriculum_ingestion.workload_identity_provider
+  value       = google_iam_workload_identity_pool_provider.github_provider.name
   sensitive   = false
 }
 

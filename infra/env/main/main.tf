@@ -140,6 +140,7 @@ module "sa_core_admin_api" {
   project_roles = [
     "roles/datastore.user",
     "roles/firebase.admin",
+    "roles/secretmanager.secretAccessor",
     "roles/bigquery.dataViewer",
     "roles/redis.admin",
     "roles/pubsub.publisher",
@@ -155,7 +156,8 @@ module "sa_curriculum_service" {
   display_name = "Curriculum Service Account"
   project_roles = [
     "roles/datastore.user",
-    "roles/storage.objectAdmin"
+    "roles/storage.objectAdmin",
+    "roles/aiplatform.user" # For Gemini API access (GCS PDF processing)
     # roles/pubsub.publisher removed - API migration (Dec 16, 2025)
   ]
 }
@@ -171,6 +173,28 @@ module "sa_core_admin_webapp" {
     "roles/monitoring.metricWriter",
     "roles/artifactregistry.writer" # For CI/CD Docker image push
   ]
+}
+
+# Core Admin Web App Auth Admin Service Account
+# Used by a script (Firebase Admin SDK) to manage Firebase Auth users and set custom claims.
+module "sa_core_admin_auth_admin" {
+  source       = "../../modules/service_account"
+  project_id   = local.project_id
+  account_id   = "sa-core-admin-auth-admin"
+  display_name = "Core Admin Auth Admin (Firebase Auth)"
+  description  = "Service account for Firebase Admin SDK operations: setCustomUserClaims, createUser (bootstrap)"
+  project_roles = [
+    "roles/firebaseauth.admin"
+  ]
+}
+
+# Optional: allow CI/admins to impersonate without JSON keys.
+resource "google_service_account_iam_member" "core_admin_auth_admin_impersonators" {
+  for_each = toset(var.core_admin_auth_admin_impersonators)
+
+  service_account_id = module.sa_core_admin_auth_admin.id
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = each.key
 }
 
 # Curriculum Ingestion Service Account
@@ -296,6 +320,13 @@ resource "google_cloud_run_v2_service_iam_member" "ingestion_invoke_curriculum" 
   name     = "curriculum-service"
   role     = "roles/run.invoker"
   member   = "serviceAccount:${module.sa_curriculum_ingestion.email}"
+}
+
+# Grant Eventarc service account permission to read the bucket
+resource "google_storage_bucket_iam_member" "eventarc_bucket_reader" {
+  bucket = module.curriculum_pdf_uploads_bucket.name
+  role   = "roles/storage.legacyBucketReader"
+  member = "serviceAccount:service-79785327518@gcp-sa-eventarc.iam.gserviceaccount.com"
 }
 
 # CIE Worker Service - DEPRECATED (API migration)
@@ -495,21 +526,22 @@ module "core_admin_api" {
   image                 = "us-central1-docker.pkg.dev/octo-education-ddc76/services/core-admin-api:latest"
   service_account_email = module.sa_core_admin_api.email
 
-  cpu           = "1"
+  cpu           = "0.5"
   memory        = "512Mi"
-  concurrency   = 80
+  concurrency   = 1
   min_instances = 0
-  max_instances = 10
+  max_instances = 2
   ingress       = "INGRESS_TRAFFIC_ALL"
 
   env_vars = {
-    GCP_PROJECT_ID = "octo-education-ddc76"
-    ENVIRONMENT    = "production"
+    GCP_PROJECT_ID  = "octo-education-ddc76"
+    ENVIRONMENT     = "production"
+    ALLOWED_ORIGINS = "https://octo-education-ddc76.web.app"
   }
 
   secrets = {
     JWT_SECRET = {
-      secret  = "jwt-secret"
+      secret  = "core-admin-api-jwt-secret"
       version = "latest"
     }
   }
@@ -537,6 +569,7 @@ module "curriculum_service" {
     CLOUD_STORAGE_BUCKET            = "octo-education-ddc76-curriculum-materials"
     PUBSUB_PROJECT_ID               = "octo-education-ddc76"
     PUBSUB_TOPIC_CURRICULUM_UPDATED = "curriculum.objective.updated"
+    GCP_LOCATION                    = "global" # Gemini 3 Flash only available in global region
     CIE_API_URL                     = module.cie_api_service.url
     CIE_API_ENABLED                 = "true"
     PUBSUB_ENABLED                  = "false"
@@ -700,16 +733,15 @@ module "curriculum_ingestion_function" {
   }
 
   env_vars = {
-    PROJECT_ID                = "octo-education-ddc76"
-    GCP_PROJECT_ID            = "octo-education-ddc76"
-    FIRESTORE_PROJECT_ID      = "octo-education-ddc76"
-    CURRICULUM_API_URL        = module.curriculum_service.url
-    CIE_API_URL               = module.cie_api_service.url
-    DOCUMENT_AI_PROCESSOR_ID  = var.document_ai_processor_id
-    DOCUMENT_AI_LOCATION      = "us"
-    PROCESSING_RESULTS_BUCKET = module.curriculum_processing_results_bucket.name
-    GEMINI_MODEL_ID           = "gemini-2.5-pro"
-    GEMINI_LOCATION           = "us-central1"
+    PROJECT_ID                 = "octo-education-ddc76"
+    GCP_PROJECT_ID             = "octo-education-ddc76"
+    FIRESTORE_PROJECT_ID       = "octo-education-ddc76"
+    CURRICULUM_API_URL         = module.curriculum_service.url
+    CIE_API_URL                = "https://curriculum-intelligence-engine-api-79785327518.us-central1.run.app"
+    DOCUMENT_AI_PROCESSOR_NAME = var.document_ai_processor_name
+    PROCESSING_RESULTS_BUCKET  = module.curriculum_processing_results_bucket.name
+    GEMINI_MODEL_ID            = "gemini-2.5-pro"
+    GEMINI_LOCATION            = "us-central1"
   }
 }
 
@@ -717,13 +749,47 @@ module "curriculum_ingestion_function" {
 # 7. GITHUB WORKLOAD IDENTITY
 ########################################
 
-# Curriculum Ingestion Workload Identity
-module "github_wif_curriculum_ingestion" {
-  source = "../../modules/github_workload_identity"
+# Shared GitHub Actions Workload Identity Pool
+resource "google_iam_workload_identity_pool" "github_pool" {
+  workload_identity_pool_id = "github-actions"
+  display_name              = "GitHub Actions Pool"
+  description               = "Workload Identity Pool for GitHub Actions"
+  project                   = local.project_id
+}
 
-  project_id         = local.project_id
+resource "google_iam_workload_identity_pool_provider" "github_provider" {
+  workload_identity_pool_id          = google_iam_workload_identity_pool.github_pool.workload_identity_pool_id
+  workload_identity_pool_provider_id = "github"
+  display_name                       = "GitHub Provider"
+  description                        = "OIDC provider for GitHub Actions"
+  project                            = local.project_id
+
+  attribute_mapping = {
+    "google.subject"       = "assertion.sub"
+    "attribute.actor"      = "assertion.actor"
+    "attribute.repository" = "assertion.repository"
+  }
+
+  # Allow both curriculum repositories
+  attribute_condition = "assertion.repository_owner == 'samahfashi6-blip'"
+
+  oidc {
+    issuer_uri = "https://token.actions.githubusercontent.com"
+  }
+}
+
+# Curriculum Ingestion Workload Identity Binding
+resource "google_service_account_iam_member" "wif_curriculum_ingestion" {
   service_account_id = module.sa_curriculum_ingestion.id
-  github_repository  = "samahfashi6-blip/curriculum_ingestion"
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github_pool.name}/attribute.repository/samahfashi6-blip/curriculum_ingestion"
+}
+
+# Curriculum Service Workload Identity Binding
+resource "google_service_account_iam_member" "wif_curriculum_service" {
+  service_account_id = module.sa_github_actions.id
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github_pool.name}/attribute.repository/samahfashi6-blip/curriculum_service"
 }
 
 ########################################
@@ -748,4 +814,13 @@ resource "google_storage_bucket_iam_member" "github_actions_cloudbuild_bucket" {
   bucket = "octo-education-ddc76_cloudbuild"
   role   = "roles/storage.objectAdmin"
   member = "serviceAccount:${module.sa_github_actions.email}"
+}
+
+# Artifact Registry IAM - Allow github-actions to push Docker images
+resource "google_artifact_registry_repository_iam_member" "github_actions_writer" {
+  project    = local.project_id
+  location   = local.region
+  repository = "services"
+  role       = "roles/artifactregistry.writer"
+  member     = "serviceAccount:${module.sa_github_actions.email}"
 }

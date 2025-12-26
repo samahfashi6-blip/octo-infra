@@ -1,3 +1,3 @@
 output "url" {
-  value = google_cloud_run_v2_service.this.uri
+  value = local.service_uri
 }

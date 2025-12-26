@@ -21,3 +21,9 @@ variable "secrets" {
   }))
   default = {}
 }
+
+variable "ignore_image_changes" {
+  type        = bool
+  default     = true
+  description = "If true, Terraform will ignore changes to the deployed container image (allows CI/CD to deploy without Terraform reverting)."
+}
